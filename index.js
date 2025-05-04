@@ -39,8 +39,8 @@ const getHeaders = (releaseTag) => [
 // Audio asset (static)
 const getAssets = () => [
   {
-    source: path.join(__dirname, "assets/background_music.mp3"),
-    path: "assets/background_music.mp3",
+    source: path.join(__dirname, "assets/background_music.wav"),
+    path: "assets/background_music.wav",
   },
 ];
 
@@ -50,8 +50,7 @@ const mainC = `
 
 // Include Arcade library (header + implementation) and standard I/O for text formatting
 #define ARCADE_IMPLEMENTATION
-#include "arcade.h"
-#include <stdio.h>
+#include "arcade/arcade.h"
 
 // Define window dimensions as constants for easy modification
 #define WINDOW_WIDTH 600
@@ -60,8 +59,8 @@ const mainC = `
 // Enum for game states to manage different screens (Start, Playing)
 typedef enum
 {
-    Start,   // Start screen with "Press Space to Start" prompt
-    Playing  // Gameplay where the player moves the square
+    Start,  // Start screen with "Press Space to Start" prompt
+    Playing // Gameplay where the player moves the square
 } GameState;
 
 int main(void)
@@ -73,12 +72,14 @@ int main(void)
 
     // Initialize player sprite (40x40 red square at window center)
     ArcadeSprite player = {
-        .x = WINDOW_WIDTH / 2 - 20.0f, // Center horizontally (600/2 - 40/2)
+        .x = WINDOW_WIDTH / 2 - 20.0f,  // Center horizontally (600/2 - 40/2)
         .y = WINDOW_HEIGHT / 2 - 20.0f, // Center vertically (600/2 - 40/2)
-        .width = 40.0f, .height = 40.0f, // Size of the square
-        .vy = 0.0f, .vx = 0.0f, // Initial velocity (stationary)
+        .width = 40.0f,
+        .height = 40.0f, // Size of the square
+        .vy = 0.0f,
+        .vx = 0.0f,        // Initial velocity (stationary)
         .color = 0xFF0000, // Red color (RGB hex)
-        .active = 1 // Sprite is active (visible)
+        .active = 1        // Sprite is active (visible)
     };
 
     // Initialize sprite group to manage rendering of all sprites
@@ -86,13 +87,15 @@ int main(void)
     arcade_init_group(&group, 1); // Only one sprite (player)
 
     // Initialize Arcade window (600x600, black background)
-    if (arcade_init(WINDOW_WIDTH, WINDOW_HEIGHT, "ARCADE: Move Square", 0x000000) != 0) {
+    if (arcade_init(WINDOW_WIDTH, WINDOW_HEIGHT, "ARCADE: Move Square", 0x000000) != 0)
+    {
         arcade_free_group(&group);
         return 1;
     }
 
     // Main game loop: runs until the window is closed
-    while (arcade_running() && arcade_update()) {
+    while (arcade_running() && arcade_update())
+    {
         // Reset sprite group each frame
         group.count = 0;
         // Add player to render group if active
@@ -102,17 +105,19 @@ int main(void)
         arcade_render_group(&group);
 
         // Handle game states
-        switch (state) {
+        switch (state)
+        {
         case Start:
             // Display start prompt in the center
             snprintf(text, sizeof(text), "Press Space to Start");
             arcade_render_text_centered(text, WINDOW_HEIGHT / 2.0f, 0xFFFFFF); // White text
             // Transition to Playing state on spacebar press
-            if (arcade_key_pressed_once(a_space) == 2) {
+            if (arcade_key_pressed_once(a_space) == 2)
+            {
                 arcade_clear_keys(); // Clear input to avoid immediate actions
                 state = Playing;
                 // Start background music
-                arcade_play_sound("assets/background_music.mp3");
+                arcade_play_sound("assets/background_music.wav");
             }
             break;
         case Playing:
@@ -153,6 +158,7 @@ int main(void)
 
     // Clean up: free sprite group and window
     arcade_free_group(&group);
+    arcade_stop_sound();
     arcade_quit();
     return 0;
 }
@@ -324,7 +330,7 @@ program
       console.log(colors.white(`  make run      # Run the game`));
       console.log(
         colors.pink(
-          "Background music is included in assets/background_music.mp3."
+          "Background music is included in assets/background_music.wav."
         )
       );
     } catch (err) {

@@ -7,6 +7,7 @@ const chalk = require("chalk");
 const ora = require("ora");
 const figlet = require("figlet");
 const path = require("path");
+const readline = require("readline");
 
 // Use chalk's built-in colors
 const colors = {
@@ -36,10 +37,10 @@ const getHeaders = (releaseTag) => [
   },
 ];
 
-// Audio asset (static)
+// Audio asset (GitHub link)
 const getAssets = () => [
   {
-    source: path.join(__dirname, "assets/background_music.wav"),
+    url: "https://github.com/GeorgeET15/arcade-lib/blob/main/include/background_music.wav",
     path: "assets/background_music.wav",
   },
 ];
@@ -251,6 +252,60 @@ const getLatestReleaseTag = async () => {
   }
 };
 
+// Prompt user for config data
+const promptForConfig = (appName) => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    const config = {
+      gameName: appName,
+      version: "1.0.0",
+      binaryName: "game",
+      iconPath: "",
+      author: "",
+      description: "",
+    };
+
+    const prompt = (question, defaultValue) =>
+      new Promise((resolve) => {
+        rl.question(colors.white(question), (answer) => {
+          resolve(answer.trim());
+        });
+      });
+
+    (async () => {
+      config.gameName =
+        (await prompt(`Game Name (${config.gameName}): `, config.gameName)) ||
+        config.gameName;
+      config.version =
+        (await prompt(`Version (${config.version}): `, config.version)) ||
+        config.version;
+      const binaryInput = await prompt(
+        `Binary Name (${config.binaryName}): `,
+        config.binaryName
+      );
+      config.binaryName = binaryInput || config.binaryName;
+      config.iconPath =
+        (await prompt(`Icon Path (leave blank for none): `, config.iconPath)) ||
+        config.iconPath;
+      config.author =
+        (await prompt(`Author (leave blank for none): `, config.author)) ||
+        config.author;
+      config.description =
+        (await prompt(
+          `Description (leave blank for none): `,
+          config.description
+        )) || config.description;
+
+      rl.close();
+      resolve(config);
+    })();
+  });
+};
+
 // Init command
 program
   .command("init <app-name>")
@@ -301,16 +356,19 @@ program
         return;
       }
 
-      // Create assets directory and copy music
+      // Create assets directory and download music
       spinner.text = "Creating assets directory...";
       await fs.ensureDir(`${appName}/assets`);
       const assets = getAssets();
-      spinner.text = "Copying background music...";
+      spinner.text = "Downloading background music...";
       for (const asset of assets) {
         try {
-          await fs.copyFile(asset.source, `${appName}/${asset.path}`);
+          const response = await axios.get(asset.url, {
+            responseType: "arraybuffer",
+          });
+          await fs.outputFile(`${appName}/${asset.path}`, response.data);
         } catch (err) {
-          throw new Error(`Failed to copy ${asset.path}: ${err.message}`);
+          throw new Error(`Failed to download ${asset.path}: ${err.message}`);
         }
       }
 
@@ -319,6 +377,14 @@ program
       await fs.outputFile(`${appName}/main.c`, mainC);
       await fs.outputFile(`${appName}/Makefile`, makefile);
       await fs.outputFile(`${appName}/.gitignore`, gitignore);
+
+      // Prompt for and write arcade.config.json
+      spinner.text = "Creating arcade.config.json...";
+      const config = await promptForConfig(appName);
+      await fs.outputFile(
+        `${appName}/arcade.config.json`,
+        JSON.stringify(config, null, 2)
+      );
 
       spinner.succeed(
         colors.teal(`Created game project ${appName} with ARCADE ${releaseTag}`)
@@ -333,6 +399,7 @@ program
           "Background music is included in assets/background_music.wav."
         )
       );
+      console.log(colors.pink("Configuration saved in arcade.config.json."));
     } catch (err) {
       spinner.fail(colors.pink(`Error: ${err.message}`));
       process.exit(1);

@@ -1,18 +1,32 @@
 # Arcade CLI
 
-A command-line tool for initializing retro 2D game projects using the [ARCADE](https://github.com/GeorgeET15/arcade-lib) (Awesome Rendering Control And Dynamics Engine) library, a lightweight, single-header C library for Windows (Win32) and Linux (X11).
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/GeorgeET15/arcade-cli/blob/main/LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/GeorgeET15/arcade-cli)](https://github.com/GeorgeET15/arcade-cli/releases)
+
+A command-line tool for initializing retro 2D game projects using the [ARCADE](https://github.com/GeorgeET15/arcade-lib) (Awesome Rendering Control And Dynamics Engine) library, a lightweight, single-header C library for Windows (Win32) and Linux (X11). Compatible with Arcade IDE version 1.1.0 and above.
 
 ## Features
 
 - Initializes a game project with `arcade.h` and STB dependencies (`stb_image.h`, `stb_image_write.h`, `stb_image_resize2.h`).
 - Creates a `main.c` with a beginner-friendly template (move a red square with arrow keys, display text, play background music).
-- Includes a `Makefile` for cross-platform compilation (Windows and Linux).
+- Includes a `Makefile` for cross-platform compilation (Windows and Linux) with normalized paths for consistency.
 - Adds a `.gitignore` for clean version control.
 - Supports a `-b`/`--blank` flag for minimal projects (only library headers).
 - Features a polished UI with ASCII art, colored output, and progress spinners.
-- Includes a static `background_music.mp3` for the game demo.
+- Includes a static `background_music.wav` for the game demo.
+- Validates assets and provides clear error messages for missing files or dependencies.
 
 ## Installation
+
+### Prerequisites
+
+- **Node.js**: Version 14+ required to run the CLI.
+- **gcc**: For compiling game projects.
+- **Windows**: MinGW with `gdi32` and `winmm` libraries.
+- **Linux**: X11 development libraries (`libx11-dev`, `libm`).
+- **Static Asset**: A valid `background_music.wav` in the CLI’s `./assets/` directory.
+
+### Install Arcade CLI
 
 Install globally via npm:
 
@@ -20,16 +34,35 @@ Install globally via npm:
 npm install -g arcade-cli
 ```
 
+The CLI is installed to your global npm directory, typically:
+
+- Linux/Mac: `~/.npm-global/bin/arcade`
+- Windows: `%APPDATA%\npm\arcade`
+
 ### Additional Setup
 
-1. **Place `background_music.mp3`**:
+1. **Place `background_music.wav`**:
 
-   - Create an `assets/` directory in the CLI's installation directory (where `arcade-cli.js` is located).
-   - Add a valid `background_music.mp3` file to `./assets/`. You can use a Creative Commons MP3 from [freesound.org](https://freesound.org) or another source.
-   - Example path: `./node_modules/arcade-cli/assets/background_music.mp3`.
+   - Locate the CLI’s installation directory (e.g., `./node_modules/arcade-cli/` in your global npm modules).
+   - Create an `assets/` directory: `./node_modules/arcade-cli/assets/`.
+   - Add a valid `background_music.wav` file (e.g., a Creative Commons wav from [freesound.org](https://freesound.org)).
+   - Verify the file exists at: `./node_modules/arcade-cli/assets/background_music.wav`.
+   - The CLI validates this file and outputs an error if missing or invalid.
 
-2. **Install Dependencies**:
-   - Ensure Node.js dependencies are installed:
+2. **Install Build Dependencies**:
+
+   - **Windows**: Install MinGW (e.g., via MSYS2):
+     ```bash
+     pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-make
+     ```
+     Add MinGW’s `bin/` to your system PATH.
+   - **Linux (Ubuntu/Debian)**: Install build tools and X11 libraries:
+     ```bash
+     sudo apt-get install build-essential libx11-dev
+     ```
+
+3. **Install Node.js Dependencies** (if running locally):
+   - Ensure dependencies are installed:
      ```bash
      npm install commander axios fs-extra chalk ora figlet
      ```
@@ -59,9 +92,9 @@ npm install -g arcade-cli
    - The generated `main.c` includes:
      - A red square player movable with arrow keys.
      - A start screen with "Press Space to Start".
-     - Background music (`assets/background_music.mp3`) played in the game state.
+     - Background music (`assets/background_music.wav`) played in the game state.
      - Detailed comments for beginners.
-   - Modify `main.c` to add sprites, logic, or assets. See the [ARCADE Wiki](https://github.com/GeorgeET15/arcade-lib/wiki) for documentation.
+   - Modify `main.c` to add sprites, logic, or assets. See the [ARCADE Wiki](https://arcade-lib.vercel.app/) for documentation.
 
 ## Usage
 
@@ -105,7 +138,7 @@ my-game/
 │   ├── stb_image_write.h
 │   ├── stb_image_resize2.h
 ├── assets/
-│   ├── background_music.mp3
+│   ├── background_music.wav
 ├── main.c
 ├── Makefile
 ├── .gitignore
@@ -124,11 +157,11 @@ my-lib/
 
 ## Requirements
 
-- **Node.js**: Required to run the CLI.
+- **Node.js**: Version 14+.
 - **gcc**: For compiling the game.
 - **Windows**: MinGW or equivalent for `gdi32` and `winmm` libraries.
 - **Linux**: X11 development libraries (`libx11-dev`, `libm`).
-- **Static Asset**: A valid `background_music.mp3` in the CLI’s `./assets/` directory (e.g., `./node_modules/arcade-cli/assets/`).
+- **Static Asset**: A valid `background_music.wav` in the CLI’s `./assets/` directory (e.g., `./node_modules/arcade-cli/assets/`).
 - **Node.js Dependencies**:
   - `commander`, `axios`, `fs-extra`, `chalk`, `ora`, `figlet`.
 
@@ -140,8 +173,12 @@ npm install commander axios fs-extra chalk ora figlet
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](https://github.com/GeorgeET15/arcade-cli/blob/main/CONTRIBUTING.md) for guidelines on contributing to Arcade CLI.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](https://github.com/GeorgeET15/arcade-cli/blob/main/LICENSE) for details.
+
+## Contact
+
+Have questions or ideas? Open an issue on [GitHub](https://github.com/GeorgeET15/arcade-cli/issues), join our [GitHub Discussions](https://github.com/GeorgeET15/arcade-cli/discussions), or email GeorgeET15 at georgeemmanuelthomas@gmail.com.

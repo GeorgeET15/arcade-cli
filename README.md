@@ -8,23 +8,24 @@ A command-line tool for initializing retro 2D game projects using the [ARCADE](h
 ## Features
 
 - Initializes a game project with `arcade.h` and STB dependencies (`stb_image.h`, `stb_image_write.h`, `stb_image_resize2.h`).
-- Creates a `main.c` with a beginner-friendly template (move a red square with arrow keys, display text, play background music).
-- Includes a `Makefile` for cross-platform compilation (Windows and Linux) with normalized paths for consistency.
-- Adds a `.gitignore` for clean version control.
-- Supports a `-b`/`--blank` flag for minimal projects (only library headers).
-- Features a polished UI with ASCII art, colored output, and progress spinners.
-- Includes a static `background_music.wav` for the game demo.
-- Validates assets and provides clear error messages for missing files or dependencies.
+- Creates a `main.c` with a beginner-friendly demo (move a red square with arrow keys, display text, play background music).
+- Generates a cross-platform `Makefile` for Windows (`gdi32`, `winmm`) and Linux (`X11`, `libm`) with normalized paths.
+- Includes a `.gitignore` for clean version control.
+- Supports a `-b`/`--blank` flag for minimal projects with basic setup (library headers, empty `main.c`, `Makefile`).
+- Features an interactive UI with ASCII art, colored output, progress spinners, and configuration prompts.
+- Automatically downloads `background_music.wav` from the ARCADE repository for the demo project.
+- Generates an `arcade.config.json` file to store project metadata (game name, version, etc.).
+- Validates assets and provides clear error messages for network issues or missing dependencies.
 
 ## Installation
 
 ### Prerequisites
 
-- **Node.js**: Version 14+ required to run the CLI.
-- **gcc**: For compiling game projects.
-- **Windows**: MinGW with `gdi32` and `winmm` libraries.
+- **Node.js**: Version 16+ (recommended for compatibility).
+- **gcc**: Required for compiling game projects.
+- **Windows**: MinGW with `gdi32` and `winmm` libraries (e.g., via MSYS2).
 - **Linux**: X11 development libraries (`libx11-dev`, `libm`).
-- **Static Asset**: A valid `background_music.wav` in the CLI’s `./assets/` directory.
+- **Internet Connection**: Required to fetch `arcade.h`, STB headers, and `background_music.wav` from GitHub.
 
 ### Install Arcade CLI
 
@@ -36,22 +37,20 @@ npm install -g arcade-cli
 
 The CLI is installed to your global npm directory, typically:
 
-- Linux/Mac: `~/.npm-global/bin/arcade`
-- Windows: `%APPDATA%\npm\arcade`
+- **Linux**: `~/.npm-global/bin/arcade`
+- **Windows**: `%APPDATA%\npm\arcade`
+
+Verify the installation:
+
+```bash
+arcade --help
+```
 
 ### Additional Setup
 
-1. **Place `background_music.wav`**:
+1. **Install Build Dependencies**:
 
-   - Locate the CLI’s installation directory (e.g., `./node_modules/arcade-cli/` in your global npm modules).
-   - Create an `assets/` directory: `./node_modules/arcade-cli/assets/`.
-   - Add a valid `background_music.wav` file (e.g., a Creative Commons wav from [freesound.org](https://freesound.org)).
-   - Verify the file exists at: `./node_modules/arcade-cli/assets/background_music.wav`.
-   - The CLI validates this file and outputs an error if missing or invalid.
-
-2. **Install Build Dependencies**:
-
-   - **Windows**: Install MinGW (e.g., via MSYS2):
+   - **Windows**: Install MinGW via MSYS2:
      ```bash
      pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-make
      ```
@@ -61,11 +60,11 @@ The CLI is installed to your global npm directory, typically:
      sudo apt-get install build-essential libx11-dev
      ```
 
-3. **Install Node.js Dependencies** (if running locally):
-   - Ensure dependencies are installed:
-     ```bash
-     npm install commander axios fs-extra chalk ora figlet
-     ```
+2. **Install Node.js Dependencies** (if running locally):
+   If you’re running the CLI from source (not globally installed), install dependencies:
+   ```bash
+   npm install commander axios fs-extra chalk ora figlet
+   ```
 
 ## Getting Started
 
@@ -75,12 +74,24 @@ The CLI is installed to your global npm directory, typically:
      ```bash
      arcade init my-game
      ```
-   - Create a blank project (only library headers):
+   - Create a blank project (library headers, empty `main.c`, `Makefile`):
      ```bash
      arcade init my-lib -b
      ```
 
-2. **Build and Run** (for full projects):
+2. **Answer Configuration Prompts**:
+
+   - The CLI will prompt for:
+     - Game Name (default: project name)
+     - Version (default: `1.0.0`)
+     - Binary Name (default: `game`)
+     - Main Source File (default: `main.c`)
+     - Icon Path (optional)
+     - Author (optional)
+     - Description (optional)
+   - These details are saved in `arcade.config.json`.
+
+3. **Build and Run** (for full projects):
 
    ```bash
    cd my-game
@@ -88,11 +99,11 @@ The CLI is installed to your global npm directory, typically:
    make run
    ```
 
-3. **Explore `main.c`**:
-   - The generated `main.c` includes:
-     - A red square player movable with arrow keys.
+4. **Explore `main.c`**:
+   - The demo in `main.c` includes:
+     - A red square movable with arrow keys.
      - A start screen with "Press Space to Start".
-     - Background music (`assets/background_music.wav`) played in the game state.
+     - Background music (`assets/background_music.wav`) played during gameplay.
      - Detailed comments for beginners.
    - Modify `main.c` to add sprites, logic, or assets. See the [ARCADE Wiki](https://arcade-lib.vercel.app/) for documentation.
 
@@ -106,7 +117,7 @@ arcade init <app-name> [-b, --blank]
 
 ### Options
 
-- `-b, --blank`: Create a minimal project with only the Arcade library headers.
+- `-b, --blank`: Create a minimal project with library headers, an empty `main.c`, and a basic `Makefile`.
 
 ### Examples
 
@@ -123,7 +134,8 @@ arcade init <app-name> [-b, --blank]
   ```bash
   arcade init my-lib -b
   cd my-lib
-  # Add your own source files and Makefile
+  # Add your own game logic to main.c
+  make
   ```
 
 ## Project Structure
@@ -142,6 +154,7 @@ my-game/
 ├── main.c
 ├── Makefile
 ├── .gitignore
+├── arcade.config.json
 ```
 
 ### Blank Project (`-b`)
@@ -153,15 +166,19 @@ my-lib/
 │   ├── stb_image.h
 │   ├── stb_image_write.h
 │   ├── stb_image_resize2.h
+├── assets
+├── main.c
+├── Makefile
+├── .gitignore
+├── arcade.config.json
 ```
 
 ## Requirements
 
-- **Node.js**: Version 14+.
-- **gcc**: For compiling the game.
-- **Windows**: MinGW or equivalent for `gdi32` and `winmm` libraries.
+- **Node.js**: Version 16+.
+- **gcc**: For compiling game projects.
+- **Windows**: MinGW with `gdi32` and `winmm` libraries.
 - **Linux**: X11 development libraries (`libx11-dev`, `libm`).
-- **Static Asset**: A valid `background_music.wav` in the CLI’s `./assets/` directory (e.g., `./node_modules/arcade-cli/assets/`).
 - **Node.js Dependencies**:
   - `commander`, `axios`, `fs-extra`, `chalk`, `ora`, `figlet`.
 
@@ -170,6 +187,20 @@ Install dependencies if running locally:
 ```bash
 npm install commander axios fs-extra chalk ora figlet
 ```
+
+## Troubleshooting
+
+- **"arcade: command not found"**:
+  - Ensure the global npm bin directory is in your PATH:
+    - Linux: `export PATH=~/.npm-global/bin:$PATH`
+    - Windows: Add `%APPDATA%\npm` to your system PATH.
+- **Network Errors**:
+  - Verify your internet connection, as the CLI fetches assets from GitHub.
+  - Check GitHub status (https://www.githubstatus.com/) for outages.
+- **Build Errors**:
+  - Ensure `gcc` and platform-specific libraries (`gdi32`, `winmm` for Windows; `libx11-dev`, `libm` for Linux) are installed.
+- **Missing `background_music.wav`**:
+  - The CLI fetches this file from the ARCADE repository. Ensure the repository is accessible.
 
 ## Contributing
 
@@ -181,4 +212,4 @@ MIT License. See [LICENSE](https://github.com/GeorgeET15/arcade-cli/blob/main/LI
 
 ## Contact
 
-Have questions or ideas? Open an issue on [GitHub](https://github.com/GeorgeET15/arcade-cli/issues), join our [GitHub Discussions](https://github.com/GeorgeET15/arcade-cli/discussions), or email GeorgeET15 at georgeemmanuelthomas@gmail.com.
+Have questions or ideas? Open an issue on [GitHub](https://github.com/GeorgeET15/arcade-cli/issues), join our [GitHub Discussions](https://github.com/GeorgeET15/arcade-cli/discussions), or email the maintainer at georgeemmanuelthomas@gmail.com.

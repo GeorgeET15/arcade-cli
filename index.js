@@ -1,20 +1,29 @@
 #!/usr/bin/env node
-
 const { program } = require("commander");
 const axios = require("axios");
 const fs = require("fs-extra");
 const chalk = require("chalk");
 const ora = require("ora");
-const figlet = require("figlet");
+const gradient = require("gradient-string");
 const path = require("path");
-const readline = require("readline");
+const inquirer = require("inquirer");
+const ProgressBar = require("cli-progress");
+const figlet = require("figlet");
 
-// Use chalk's built-in colors
 const colors = {
-  teal: chalk.cyan.bold,
-  pink: chalk.magenta,
-  yellow: chalk.yellow.underline,
-  white: chalk.white,
+  teal: chalk.hex("#14c9c9").bold,
+  pink: chalk.hex("#FF7BDF"),
+  yellow: chalk.hex("#ffda41").underline,
+  white: chalk.hex("#F7EFEA"),
+  magenta: chalk.hex("#EC2955").bold,
+  blue: chalk.hex("#3ad1ff"),
+  border: chalk.hex("#262533"),
+  green: chalk.hex("#00FF00"),
+};
+
+const minimalSpinner = {
+  interval: 80,
+  frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
 };
 
 // Header files with dynamic release tag
@@ -37,16 +46,214 @@ const getHeaders = (releaseTag) => [
   },
 ];
 
-// Audio asset (GitHub link)
+// Audio asset
 const getAssets = () => [
   {
-    url: "https://github.com/GeorgeET15/arcade-lib/blob/main/include/background_music.wav",
+    url: "https://raw.githubusercontent.com/GeorgeET15/arcade-lib/main/include/background_music.wav",
     path: "assets/background_music.wav",
   },
 ];
 
+// Empty C file for blank project
+const emptyC = (name) =>
+  `
+// ${name}.c: Main source file for your Arcade game
+#define ARCADE_IMPLEMENTATION
+#include "arcade/arcade.h"
+
+int main(void) {
+    // Your game code here
+    return 0;
+}
+`.trim();
+
+// Empty Makefile for blank project
+const emptyMakefile = (srcFile) =>
+  `
+CC = gcc
+CFLAGS = -Iarcade
+LDFLAGS_WIN = -lgdi32 -lwinmm
+LDFLAGS_LINUX = -lX11 -lm
+TARGET = game
+SRC = ${srcFile}
+
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+\t@echo "Building for $(shell uname -s)..."
+\t@if [ "$(shell uname -s)" = "Linux" ]; then \
+\t\t$(CC) $(SRC) $(CFLAGS) $(LDFLAGS_LINUX) -o $(TARGET); \
+\telse \
+\t\t$(CC) $(SRC) $(CFLAGS) $(LDFLAGS_WIN) -o $(TARGET).exe; \
+\tfi
+
+clean:
+\t@rm -f $(TARGET) $(TARGET).exe
+
+run: $(TARGET)
+\t@if [ "$(shell uname -s)" = "Linux" ]; then \
+\t\t./$(TARGET); \
+\telse \
+\t\t./$(TARGET).exe; \
+\tfi
+
+.PHONY: all clean run
+`.trim();
+
+// Gitignore file
+const gitignore = `
+# Build artifacts
+game
+game.exe
+*.o
+
+# IDE files
+.vscode/
+.idea/
+
+# Misc
+*.log
+`.trim();
+
+const showHome = () => {
+  try {
+    const gradientColors = [
+      "#14c9c9",
+      "#FF7BDF",
+      "#ffda41",
+      "#F7EFEA",
+      "#EC2955",
+      "#3ad1ff",
+    ];
+    const customGradient = gradient(gradientColors);
+
+    const arcadeArt = figlet.textSync("ARCADE", {
+      font: "ANSI Shadow",
+      horizontalLayout: "default",
+      verticalLayout: "default",
+    });
+
+    const lines = arcadeArt.split("\n");
+    const maxWidth = Math.max(...lines.map((line) => line.length));
+    const paddedArt = lines
+      .map((line) => customGradient(line.padEnd(maxWidth)))
+      .join("\n");
+
+    console.log("\n");
+    console.log(`${paddedArt}`);
+    console.log(colors.yellow("Usage:"));
+    console.log(colors.white("  arcade init [app-name] [-b, --blank]"));
+    console.log(colors.yellow("Options:"));
+    console.log(colors.white("  -b, --blank  Create a blank project"));
+  } catch (err) {
+    console.error(colors.magenta(`Error: ${err.message}`));
+  }
+};
+
+// Check latest release tag
+const getLatestReleaseTag = async () => {
+  try {
+    const response = await axios.get(
+      "https://api.github.com/repos/GeorgeET15/arcade-lib/releases/latest"
+    );
+    return response.data.tag_name;
+  } catch (err) {
+    throw new Error("Failed to fetch latest release tag.");
+  }
+};
+
+// Prompt user for config data
+const promptForConfig = async (appName) => {
+  try {
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "gameName",
+        message: colors.teal("Game Name"),
+        default: appName,
+        validate: (input) =>
+          input.trim() ? true : "Game name cannot be empty.",
+      },
+      {
+        type: "input",
+        name: "version",
+        message: colors.teal("Version"),
+        default: "1.0.0",
+      },
+      {
+        type: "input",
+        name: "binaryName",
+        message: colors.teal("Binary Name"),
+        default: "game",
+        validate: (input) => {
+          if (!input.trim()) return "Binary name cannot be empty.";
+          if (!/^[a-zA-Z0-9_-]+$/.test(input))
+            return "Binary name can only contain letters, numbers, hyphens, and underscores.";
+          return true;
+        },
+      },
+      {
+        type: "input",
+        name: "main",
+        message: colors.teal("Main Source File"),
+        default: "main.c",
+        validate: (input) =>
+          input.endsWith(".c") ? true : "File must end with .c",
+      },
+      {
+        type: "input",
+        name: "iconPath",
+        message: colors.teal("Icon Path (leave blank for none)"),
+        default: "",
+      },
+      {
+        type: "input",
+        name: "author",
+        message: colors.teal("Author (leave blank for none)"),
+        default: "",
+      },
+      {
+        type: "input",
+        name: "description",
+        message: colors.teal("Description (leave blank for none)"),
+        default: "",
+      },
+    ]);
+    return answers;
+  } catch (err) {
+    throw new Error("Configuration prompt cancelled or failed.");
+  }
+};
+
+// Prompt for project name if not provided
+const promptForProjectName = async () => {
+  try {
+    const answers = await inquirer.prompt([
+      {
+        type: "input",
+        name: "projectName",
+        message: colors.teal("Enter project name"),
+        validate: (input) => {
+          if (!input.trim()) return "Project name cannot be empty.";
+          // Exclude filesystem-reserved characters and reserved names
+          if (!/^[a-zA-Z0-9_-]+$/.test(input))
+            return "Project name can only contain letters, numbers, hyphens, and underscores.";
+          const reservedNames = ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"];
+          if (reservedNames.includes(input.toUpperCase()))
+            return "Project name is a reserved system name.";
+          return true;
+        },
+      },
+    ]);
+    return answers.projectName;
+  } catch (err) {
+    throw new Error("Project name prompt cancelled or failed.");
+  }
+};
+
+// Main C file for the game demo
 const mainC = `
-// move_square.c: A simple Arcade library game where a red square moves with arrow keys
+// A simple Arcade library game where a red square moves with arrow keys
 // This demo introduces game states, sprite rendering, input handling, and background music
 
 // Include Arcade library (header + implementation) and standard I/O for text formatting
@@ -165,13 +372,15 @@ int main(void)
 }
 `.trim();
 
-const makefile = `
+// Makefile for building the game
+const getMakefile = (binaryName, srcFile) =>
+  `
 CC = gcc
 CFLAGS = -Iarcade
 LDFLAGS_WIN = -lgdi32 -lwinmm
 LDFLAGS_LINUX = -lX11 -lm
-TARGET = game
-SRC = main.c
+TARGET = ${binaryName}
+SRC = ${srcFile}
 
 all: $(TARGET)
 
@@ -196,233 +405,244 @@ run: $(TARGET)
 .PHONY: all clean run
 `.trim();
 
-const gitignore = `
-# Build artifacts
-game
-game.exe
-*.o
-
-# IDE files
-.vscode/
-.idea/
-
-# Misc
-*.log
-`.trim();
-
-// Minimal home screen with ASCII art
-const showHome = () => {
-  try {
-    console.log(
-      colors.teal(figlet.textSync("ARCADE CLI", { font: "Standard" }))
-    );
-    console.log(colors.pink("Retro 2D Game Development with ARCADE Library"));
-    console.log(colors.white("========================================"));
-
-    console.log();
-    console.log(colors.yellow("Usage:"));
-    console.log(colors.white("  arcade init <app-name> [-b, --blank]"));
-    console.log();
-    console.log(colors.yellow("Options:"));
-    console.log(
-      colors.white(
-        "  -b, --blank  Create a blank project with only the Arcade library"
-      )
-    );
-    console.log();
-    console.log(
-      colors.pink("Get started with a game demo or a minimal setup!")
-    );
-  } catch (err) {
-    console.error(chalk.red(`Error displaying home screen: ${err.message}`));
-  }
-};
-
-// Check latest release tag
-const getLatestReleaseTag = async () => {
-  try {
-    const response = await axios.get(
-      "https://api.github.com/repos/GeorgeET15/arcade-lib/releases/latest"
-    );
-    return response.data.tag_name;
-  } catch (err) {
-    throw new Error(
-      "Failed to fetch latest release tag. Check internet connection."
-    );
-  }
-};
-
-// Prompt user for config data
-const promptForConfig = (appName) => {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  return new Promise((resolve) => {
-    const config = {
-      gameName: appName,
-      version: "1.0.0",
-      binaryName: "game",
-      iconPath: "",
-      author: "",
-      description: "",
-    };
-
-    const prompt = (question, defaultValue) =>
-      new Promise((resolve) => {
-        rl.question(colors.white(question), (answer) => {
-          resolve(answer.trim());
-        });
-      });
-
-    (async () => {
-      config.gameName =
-        (await prompt(`Game Name (${config.gameName}): `, config.gameName)) ||
-        config.gameName;
-      config.version =
-        (await prompt(`Version (${config.version}): `, config.version)) ||
-        config.version;
-      const binaryInput = await prompt(
-        `Binary Name (${config.binaryName}): `,
-        config.binaryName
-      );
-      config.binaryName = binaryInput || config.binaryName;
-      config.iconPath =
-        (await prompt(`Icon Path (leave blank for none): `, config.iconPath)) ||
-        config.iconPath;
-      config.author =
-        (await prompt(`Author (leave blank for none): `, config.author)) ||
-        config.author;
-      config.description =
-        (await prompt(
-          `Description (leave blank for none): `,
-          config.description
-        )) || config.description;
-
-      rl.close();
-      resolve(config);
-    })();
-  });
-};
+// Simplified success messages
+const successMessages = [
+  (appName, releaseTag) => `${appName} ready with ARCADE ${releaseTag}!`,
+  (appName, releaseTag) => `${appName} loaded with ARCADE ${releaseTag}!`,
+  (appName, releaseTag) => `${appName} set with ARCADE ${releaseTag}!`,
+];
 
 // Init command
 program
-  .command("init <app-name>")
+  .command("init [app-name]")
   .description("Create a new ARCADE project")
   .option("-b, --blank", "Create a blank project with only the Arcade library")
   .action(async (appName, options) => {
-    const spinner = ora(colors.teal("Initializing project...")).start();
+    let spinner = ora({
+      text: "Starting arcade machine...",
+      spinner: minimalSpinner,
+      color: "cyan",
+    }).start();
 
     try {
-      // Resolve release tag
-      const releaseTag = await getLatestReleaseTag();
+      // Prompt for project name if not provided
+      let resolvedAppName = appName;
+      if (!resolvedAppName) {
+        spinner.stop();
+        resolvedAppName = await promptForProjectName();
+        spinner = ora({
+          text: "Starting arcade machine...",
+          spinner: minimalSpinner,
+          color: "cyan",
+        }).start();
+      }
+
+      // Resolve release tag with fallback
+      spinner.text = "Fetching release tag...";
+      let releaseTag;
+      try {
+        releaseTag = await getLatestReleaseTag();
+      } catch (err) {
+        spinner.warn(
+          colors.yellow(
+            "Failed to fetch latest release tag. Using default v1.0.0."
+          )
+        );
+        releaseTag = "v1.0.0"; // Fallback tag
+      }
       const headers = getHeaders(releaseTag);
 
       // Check if directory already exists
-      if (await fs.pathExists(appName)) {
-        spinner.fail(colors.pink(`Directory ${appName} already exists.`));
-        process.exit(1);
+      spinner.text = "Checking directory...";
+      if (await fs.pathExists(resolvedAppName)) {
+        spinner.fail(
+          colors.magenta(`Error: Directory ${resolvedAppName} exists!`)
+        );
+        process.exit(2); // Specific exit code for directory conflict
       }
 
       // Create arcade directory
       spinner.text = "Creating arcade directory...";
-      await fs.ensureDir(`${appName}/arcade`);
+      try {
+        await fs.ensureDir(path.join(resolvedAppName, "arcade"));
+      } catch (err) {
+        throw new Error(`Failed to create arcade directory: ${err.message}`);
+      }
 
-      // Download headers
-      spinner.text = "Downloading Arcade headers...";
-      for (const header of headers) {
-        try {
-          const response = await axios.get(header.url, {
-            responseType: "text",
-          });
-          await fs.outputFile(`${appName}/${header.path}`, response.data);
-        } catch (err) {
-          throw new Error(`Failed to fetch ${header.path}: ${err.message}`);
-        }
+      // Download headers with progress bar
+      spinner.text = "Downloading headers...";
+      const headerBar = new ProgressBar.SingleBar({
+        format: `${colors.teal("Headers")} [${colors.blue(
+          "█"
+        )}:bar${colors.blue("█")}] :percent`,
+        barCompleteChar: "█",
+        barIncompleteChar: "▒",
+        total: headers.length,
+      });
+      headerBar.start(headers.length, 0);
+      await Promise.all(
+        headers.map(async (header) => {
+          try {
+            const response = await axios.get(header.url, {
+              responseType: "text",
+            });
+            await fs.outputFile(
+              path.join(resolvedAppName, header.path),
+              response.data
+            );
+            headerBar.increment();
+          } catch (err) {
+            throw new Error(
+              `Failed to download ${header.path}: ${err.message}`
+            );
+          }
+        })
+      );
+      headerBar.stop();
+
+      // Create assets directory
+      spinner.text = "Creating assets directory...";
+      try {
+        await fs.ensureDir(path.join(resolvedAppName, "assets"));
+      } catch (err) {
+        throw new Error(`Failed to create assets directory: ${err.message}`);
       }
 
       if (options.blank) {
+        // Prompt for configuration
+        spinner.text = "Configuring project...";
+        spinner.stop();
+        const config = await promptForConfig(resolvedAppName);
+        spinner = ora({
+          text: "Writing files...",
+          spinner: minimalSpinner,
+          color: "cyan",
+        }).start();
+
+        // Write empty C file, Makefile, and .gitignore
+        try {
+          await fs.outputFile(
+            path.join(resolvedAppName, config.main),
+            emptyC(config.main.replace(".c", ""))
+          );
+          await fs.outputFile(
+            path.join(resolvedAppName, "Makefile"),
+            emptyMakefile(config.main)
+          );
+          await fs.outputFile(
+            path.join(resolvedAppName, ".gitignore"),
+            gitignore
+          );
+          await fs.outputFile(
+            path.join(resolvedAppName, "arcade.config.json"),
+            JSON.stringify(config, null, 2)
+          );
+        } catch (err) {
+          throw new Error(`Failed to write project files: ${err.message}`);
+        }
+
+        console.log("\n");
         spinner.succeed(
-          colors.teal(
-            `Created blank project ${appName} with ARCADE ${releaseTag}`
+          colors.green(
+            successMessages[Math.floor(Math.random() * successMessages.length)](
+              resolvedAppName,
+              releaseTag
+            )
           )
         );
-        console.log(colors.white("========================================"));
-        console.log(colors.yellow("Next steps:"));
-        console.log(colors.white(`  cd ${appName}`));
-        console.log(colors.white("  Start coding with the Arcade library!"));
-        console.log(colors.pink("Headers are in the arcade/ directory."));
+        console.log("\n");
+        console.log(
+          colors.white(`Navigate to project: `) +
+            colors.yellow(`cd ${resolvedAppName}`)
+        );
+        console.log("\n");
+        console.log(colors.magenta("Happy coding !!!"));
         return;
       }
 
-      // Create assets directory and download music
-      spinner.text = "Creating assets directory...";
-      await fs.ensureDir(`${appName}/assets`);
+      // Download music for non-blank project
+      spinner.text = "Downloading assets...";
       const assets = getAssets();
-      spinner.text = "Downloading background music...";
-      for (const asset of assets) {
-        try {
-          const response = await axios.get(asset.url, {
-            responseType: "arraybuffer",
-          });
-          await fs.outputFile(`${appName}/${asset.path}`, response.data);
-        } catch (err) {
-          throw new Error(`Failed to download ${asset.path}: ${err.message}`);
-        }
-      }
-
-      // Write main.c, Makefile, and .gitignore
-      spinner.text = "Writing project files...";
-      await fs.outputFile(`${appName}/main.c`, mainC);
-      await fs.outputFile(`${appName}/Makefile`, makefile);
-      await fs.outputFile(`${appName}/.gitignore`, gitignore);
+      const assetBar = new ProgressBar.SingleBar({
+        format: `${colors.teal("Assets")} [${colors.blue("█")}:bar${colors.blue(
+          "█"
+        )}] :percent`,
+        barCompleteChar: "█",
+        barIncompleteChar: "▒",
+        total: assets.length,
+      });
+      assetBar.start(assets.length, 0);
+      await Promise.all(
+        assets.map(async (asset) => {
+          try {
+            const response = await axios.get(asset.url, {
+              responseType: "arraybuffer",
+            });
+            await fs.outputFile(
+              path.join(resolvedAppName, asset.path),
+              response.data
+            );
+            assetBar.increment();
+          } catch (err) {
+            throw new Error(`Failed to download ${asset.path}: ${err.message}`);
+          }
+        })
+      );
+      assetBar.stop();
 
       // Prompt for and write arcade.config.json
-      spinner.text = "Creating arcade.config.json...";
-      const config = await promptForConfig(appName);
-      await fs.outputFile(
-        `${appName}/arcade.config.json`,
-        JSON.stringify(config, null, 2)
-      );
+      spinner.text = "Configuring project...";
+      spinner.stop();
+      const config = await promptForConfig(resolvedAppName);
+      spinner = ora({
+        spinner: minimalSpinner,
+        color: "cyan",
+      }).start();
 
+      // Write main.c, Makefile, and .gitignore
+      try {
+        await fs.outputFile(path.join(resolvedAppName, config.main), mainC);
+        await fs.outputFile(
+          path.join(resolvedAppName, "Makefile"),
+          getMakefile(config.binaryName, config.main)
+        );
+        await fs.outputFile(
+          path.join(resolvedAppName, ".gitignore"),
+          gitignore
+        );
+        await fs.outputFile(
+          path.join(resolvedAppName, "arcade.config.json"),
+          JSON.stringify(config, null, 2)
+        );
+      } catch (err) {
+        throw new Error(`Failed to write project files: ${err.message}`);
+      }
+      console.log("\n");
       spinner.succeed(
-        colors.teal(`Created game project ${appName} with ARCADE ${releaseTag}`)
-      );
-      console.log(colors.white("========================================"));
-      console.log(colors.yellow("Next steps:"));
-      console.log(colors.white(`  cd ${appName}`));
-      console.log(colors.white(`  make          # Build the game`));
-      console.log(colors.white(`  make run      # Run the game`));
-      console.log(
-        colors.pink(
-          "Background music is included in assets/background_music.wav."
+        colors.green(
+          successMessages[Math.floor(Math.random() * successMessages.length)](
+            resolvedAppName,
+            releaseTag
+          )
         )
       );
-      console.log(colors.pink("Configuration saved in arcade.config.json."));
+      console.log("\n");
+      console.log(
+        colors.white(`Navigate to project: `) +
+          colors.yellow(`cd ${resolvedAppName}`)
+      );
+      console.log(colors.white("Build the game: ") + colors.yellow("make"));
+      console.log(colors.white("Run the game: ") + colors.yellow("make run"));
+      console.log("\n");
+      console.log(colors.magenta("Happy coding !!!"));
     } catch (err) {
-      spinner.fail(colors.pink(`Error: ${err.message}`));
-      process.exit(1);
+      spinner.fail(colors.magenta(`Error: ${err.message}`));
+      process.exit(3); // Specific exit code for general errors
+    } finally {
+      spinner.stop();
     }
   });
 
-// Handle input
-(async () => {
-  if (!process.argv.slice(2).length || process.argv.includes("--help")) {
-    showHome();
-    process.exit(0);
-  }
-
-  program.on("command:*", () => {
-    console.error(colors.pink(`Unknown command: ${program.args.join(" ")}`));
-    showHome();
-    process.exit(1);
-  });
-
-  try {
-    await program.parseAsync(process.argv);
-  } catch (err) {
-    console.error(colors.pink(`Error: ${err.message}`));
-    process.exit(1);
-  }
-})();
+// Display home screen and parse commands
+showHome();
+program.parse(process.argv);

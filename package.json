@@ -1,6 +1,6 @@
 {
   "name": "arcade-cli",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A cli tool for initializing an arcade.h project",
   "main": "index.js",
   "bin": {

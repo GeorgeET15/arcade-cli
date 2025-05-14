@@ -258,117 +258,119 @@ const mainC = `
 
 // Include Arcade library (header + implementation) and standard I/O for text formatting
 #define ARCADE_IMPLEMENTATION
-#include "arcade/arcade.h"
+#include "arcade.h"
 
-// Define window dimensions as constants for easy modification
-#define WINDOW_WIDTH 600
-#define WINDOW_HEIGHT 600
+/* Define window dimensions as constants for easy modification */
+#define WINDOW_WIDTH 600  /* Width of the game window in pixels */
+#define WINDOW_HEIGHT 600 /* Height of the game window in pixels */
 
-// Enum for game states to manage different screens (Start, Playing)
+/* Enum for game states to manage different screens */
 typedef enum
 {
-    Start,  // Start screen with "Press Space to Start" prompt
-    Playing // Gameplay where the player moves the square
+    Start,   /* Start screen with "Press Space to Start" prompt */
+    Playing  /* Gameplay state where the player moves the square */
 } GameState;
 
 int main(void)
 {
-    // Game parameters
-    float player_speed = 5.0f; // Speed of player movement (pixels per frame)
-    char text[64];             // Buffer for rendering text (e.g., instructions)
-    GameState state = Start;   // Start the game in the Start state
+    /* Game parameters */
+    float player_speed = 5.0f; /* Speed of player movement (pixels per frame at 60 FPS) */
+    char text[64];             /* Buffer for rendering text (e.g., instructions or prompts) */
+    GameState state = Start;   /* Initialize the game in the Start state */
 
-    // Initialize player sprite (40x40 red square at window center)
+    /* Initialize player sprite as a 40x40 red square positioned at the window's center */
     ArcadeSprite player = {
-        .x = WINDOW_WIDTH / 2 - 20.0f,  // Center horizontally (600/2 - 40/2)
-        .y = WINDOW_HEIGHT / 2 - 20.0f, // Center vertically (600/2 - 40/2)
-        .width = 40.0f,
-        .height = 40.0f, // Size of the square
-        .vy = 0.0f,
-        .vx = 0.0f,        // Initial velocity (stationary)
-        .color = 0xFF0000, // Red color (RGB hex)
-        .active = 1        // Sprite is active (visible)
+        .x = WINDOW_WIDTH / 2 - 20.0f,  /* Center horizontally (600/2 - 40/2 = 280) */
+        .y = WINDOW_HEIGHT / 2 - 20.0f, /* Center vertically (600/2 - 40/2 = 280) */
+        .width = 40.0f,                 /* Width of the square in pixels */
+        .height = 40.0f,                /* Height of the square in pixels */
+        .vy = 0.0f,                     /* Initial vertical velocity (stationary) */
+        .vx = 0.0f,                     /* Initial horizontal velocity (stationary) */
+        .color = 0xFF0000,              /* Red color in ARGB format (opaque red) */
+        .active = 1                     /* Sprite is active (visible and renderable) */
     };
 
-    // Initialize sprite group to manage rendering of all sprites
-    SpriteGroup group;
-    arcade_init_group(&group, 1); // Only one sprite (player)
+    /* Initialize sprite group to manage rendering of all sprites */
+    SpriteGroup group;               /* Rendering group to hold sprites for drawing */
+    arcade_init_group(&group, 1);    /* Initialize group with capacity for 1 sprite (player) */
 
-    // Initialize Arcade window (600x600, black background)
+    /* Initialize Arcade window with specified dimensions, title, and black background */
     if (arcade_init(WINDOW_WIDTH, WINDOW_HEIGHT, "ARCADE: Move Square", 0x000000) != 0)
     {
-        arcade_free_group(&group);
-        return 1;
+        arcade_free_group(&group);   /* On initialization failure, free the sprite group */
+        return 1;                    /* Exit with error code */
     }
 
-    // Main game loop: runs until the window is closed
+    /* Main game loop: runs until the window is closed or ESC is pressed */
     while (arcade_running() && arcade_update())
     {
-        // Reset sprite group each frame
+        /* Reset sprite group each frame to prepare for rendering */
         group.count = 0;
-        // Add player to render group if active
+        /* Add player to render group if active (always true in this game) */
         arcade_add_sprite_to_group(&group, (ArcadeAnySprite){.sprite = player}, SPRITE_COLOR);
 
-        // Render sprites first to clear the background and draw the player
+        /* Render sprites first to clear the background and draw the player */
         arcade_render_group(&group);
 
-        // Handle game states
+        /* Handle game states using a switch statement */
         switch (state)
         {
         case Start:
-            // Display start prompt in the center
-            snprintf(text, sizeof(text), "Press Space to Start");
-            arcade_render_text_centered(text, WINDOW_HEIGHT / 2.0f, 0xFFFFFF); // White text
-            // Transition to Playing state on spacebar press
+            /* Display start prompt in the center of the screen */
+            snprintf(text, sizeof(text), "Press Space to Start"); /* Format the start message */
+            arcade_render_text_centered(text, WINDOW_HEIGHT / 2.0f, 0xFFFFFF); /* Render white text at center Y */
+            /* Transition to Playing state on spacebar press */
             if (arcade_key_pressed_once(a_space) == 2)
             {
-                arcade_clear_keys(); // Clear input to avoid immediate actions
-                state = Playing;
-                // Start background music
+                arcade_clear_keys(); /* Clear input buffer to prevent immediate actions in Playing state */
+                state = Playing;     /* Transition to Playing state */
+                /* Start background music when the game begins */
                 arcade_play_sound("assets/background_music.wav");
             }
             break;
+
         case Playing:
-            // Display instructions at the top-left
-            snprintf(text, sizeof(text), "Use arrow keys to move around");
-            arcade_render_text(text, 10.0f, 30.0f, 0xFFFFFF); // White text
+            /* Display movement instructions at the top-left of the screen */
+            snprintf(text, sizeof(text), "Use arrow keys to move around"); /* Format instructions */
+            arcade_render_text(text, 10.0f, 30.0f, 0xFFFFFF); /* Render white text at (10, 30) */
 
-            // Handle player movement: set velocity based on arrow keys
-            player.vx = 0.0f; // Reset horizontal velocity
-            player.vy = 0.0f; // Reset vertical velocity
+            /* Handle player movement: set velocity based on arrow key input */
+            player.vx = 0.0f; /* Reset horizontal velocity each frame */
+            player.vy = 0.0f; /* Reset vertical velocity each frame */
             if (arcade_key_pressed(a_right) == 2)
-                player.vx = player_speed; // Move right
+                player.vx = player_speed;  /* Move right: set positive horizontal velocity */
             if (arcade_key_pressed(a_left) == 2)
-                player.vx = -player_speed; // Move left
+                player.vx = -player_speed; /* Move left: set negative horizontal velocity */
             if (arcade_key_pressed(a_up) == 2)
-                player.vy = -player_speed; // Move up
+                player.vy = -player_speed; /* Move up: set negative vertical velocity */
             if (arcade_key_pressed(a_down) == 2)
-                player.vy = player_speed; // Move down
+                player.vy = player_speed;  /* Move down: set positive vertical velocity */
 
-            // Update player position using velocity
-            player.x += player.vx;
-            player.y += player.vy;
-            // Keep player within window bounds
+            /* Update player position using velocity (simple Euler integration) */
+            player.x += player.vx; /* Update X position */
+            player.y += player.vy; /* Update Y position */
+
+            /* Keep player within window bounds to prevent moving off-screen */
             if (player.x < 0)
-                player.x = 0; // Left edge
+                player.x = 0; /* Clamp to left edge */
             if (player.y < 0)
-                player.y = 0; // Top edge
+                player.y = 0; /* Clamp to top edge */
             if (player.x + player.width > WINDOW_WIDTH)
-                player.x = WINDOW_WIDTH - player.width; // Right edge
+                player.x = WINDOW_WIDTH - player.width; /* Clamp to right edge */
             if (player.y + player.height > WINDOW_HEIGHT)
-                player.y = WINDOW_HEIGHT - player.height; // Bottom edge
+                player.y = WINDOW_HEIGHT - player.height; /* Clamp to bottom edge */
             break;
         }
 
-        // Sleep to maintain ~60 FPS (16ms per frame)
+        /* Sleep to maintain ~60 FPS (16ms per frame) */
         arcade_sleep(16);
     }
 
-    // Clean up: free sprite group and window
-    arcade_free_group(&group);
-    arcade_stop_sound();
-    arcade_quit();
-    return 0;
+    /* Clean up: free allocated resources before exiting */
+    arcade_free_group(&group); /* Free the sprite group */
+    arcade_stop_sound();       /* Stop background music */
+    arcade_quit();             /* Close the Arcade window */
+    return 0;                  /* Exit program successfully */
 }
 `.trim();
 
